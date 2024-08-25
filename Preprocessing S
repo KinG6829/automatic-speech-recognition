@@ -1,0 +1,73 @@
+import numpy as np
+
+# Noise Reduction using Spectral Subtraction
+def spectral_subtraction(signal, noise_estimate):
+    # Perform Fourier Transform on both the signal and noise estimate
+    signal_spectrum = np.fft.fft(signal)
+    noise_spectrum = np.fft.fft(noise_estimate)
+    
+    # Subtract the noise spectrum from the signal spectrum
+    clean_spectrum = np.maximum(np.abs(signal_spectrum) - np.abs(noise_spectrum), 0)
+    
+    # Preserve the original phase of the signal
+    phase = np.angle(signal_spectrum)
+    clean_signal = np.fft.ifft(clean_spectrum * np.exp(1j * phase)).real
+    
+    return clean_signal
+
+# Voice Activity Detection (VAD) using Energy Thresholding
+def energy_based_vad(signal, threshold, frame_duration=0.02, sampling_rate=16000):
+    frame_size = int(frame_duration * sampling_rate)  # Frame size in samples
+    num_frames = len(signal) // frame_size
+
+    # Calculate short-term energy for each frame
+    energy = np.array([sum(abs(signal[i * frame_size:(i + 1) * frame_size] ** 2)) 
+                       for i in range(num_frames)])
+
+    # Detect speech frames based on the energy threshold
+    speech_frames = energy > threshold
+
+    # Reconstruct the speech signal using detected speech frames
+    speech_signal = np.concatenate([signal[i * frame_size:(i + 1) * frame_size] 
+                                    for i in range(num_frames) if speech_frames[i]])
+    
+    return speech_signal
+
+# Normalization using Peak Normalization
+def peak_normalization(signal, target_peak=1.0):
+    max_val = np.max(np.abs(signal))
+    normalized_signal = signal * (target_peak / max_val)
+    return normalized_signal
+
+# Combined Preprocessing Function
+def preprocess_audio(signal, noise_estimate, noise_reduction=True, vad=True, normalization=True, 
+                     vad_threshold=0.01, target_peak=1.0):
+    processed_signal = signal
+
+    # Step 1: Noise Reduction using Spectral Subtraction
+    if noise_reduction:
+        processed_signal = spectral_subtraction(processed_signal, noise_estimate)
+    
+    # Step 2: Voice Activity Detection (VAD)
+    if vad:
+        processed_signal = energy_based_vad(processed_signal, vad_threshold)
+    
+    # Step 3: Normalization
+    if normalization:
+        processed_signal = peak_normalization(processed_signal, target_peak)
+    
+    return processed_signal
+
+# Example Usage
+if __name__ == "__main__":
+    # Example raw audio signal (normally you'd load this from a file)
+    audio_signal = np.random.rand(32000) - 0.5  # 2 seconds of random noise at 16kHz
+    
+    # Example noise estimate (could be a portion of the signal with just noise)
+    noise_estimate = np.random.rand(32000) - 0.5  # Simulated noise estimate
+
+    # Preprocess the audio signal
+    preprocessed_signal = preprocess_audio(audio_signal, noise_estimate)
+
+    # Output or further process the preprocessed_signal
+    print("Preprocessing complete. The signal is ready for feature extraction.")
